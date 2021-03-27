@@ -1,0 +1,21 @@
+0000    Assign            START   0
+0000    FIRST    +LDB    #RETADR          6910083E
+                  BASE    RETADR
+0004              STL     RETADR          174000
+0007              LDA    @RETADR          024000
+000A    BADR      RESW    700
+083E    RETADR    RESW    1
+0841              CLEAR   A               B400
+0843              LDX    #0               050000
+0846              LDA    #5               010005
+0849    WLOOP     TD      =X'000001'      E32009
+084C              JEQ     WLOOP           332FFA
+084F              LDCH    RETADR,X        53AFEC
+0852              WD      =X'000001'      DF2000
+                  LTORG
+0855              *       =X'000001'      000001
+0858             +LDA     =X'000007'      03101090
+085C    EADR      RESW    700
+                  LTORG
+1090              *       =X'000007'      000007
+                  END     FIRST

@@ -1,0 +1,12 @@
+Symbol  Value   Flags:
+-----------------------
+FIRST   000000  R
+BADR    00000A  R
+RETADR  00083E  R
+WLOOP   000849  R
+EADR    00085C  R
+
+Name    Literal     Length   Address:
+------------------------------------------
+        =X'000001'  6        000855
+	=X'000007'  6        001090
