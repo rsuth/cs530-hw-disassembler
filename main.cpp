@@ -72,8 +72,16 @@ std::string getOperand(std::string disp, const bool nixbpe[6], int pc, int base)
     if (nixbpe[4])
     {
         // pc relative
+
+        // negative
+        if(ta > 0x7FF){
+            ta = -1 * ((0xFFF - ta) + 1);
+        }
+
         ta += pc;
         std::cout << ta;
+
+
         // TODO: right now we need to handle the case where disp is negative.
         // need to look into twos compliment/negative hex numbers.
         // TA=(PC) + disp (-2048 <= disp <= 2047)
@@ -153,5 +161,5 @@ int main(int argc, char **argv)
     }
 
     bool nixbpe[] = {1, 1, 1, 0, 1, 0};
-    getOperand("FEC", nixbpe, 0x0852, 0);
+    getOperand("7FF", nixbpe, 0x0852, 0);
 }
