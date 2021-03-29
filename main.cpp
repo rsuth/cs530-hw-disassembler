@@ -399,9 +399,9 @@ bool readSymFile(const char *path, std::vector<SymbolEntry> &symVec, std::vector
     return 1;
 }
 
-void printListRow(ListRow r)
+void printListRow(ListRow r, std::ofstream &outfile)
 {
-    std::cout
+    outfile
         << intToHexString(r.addr, 4)
         << std::setw(4)
         << " "
@@ -422,9 +422,9 @@ void printListRow(ListRow r)
         << std::endl;
 }
 
-void printBaseLine(std::string operand)
+void printBaseLine(std::string operand, std::ofstream &outfile)
 {
-    std::cout
+    outfile
         << std::setw(17)
         << " "
         << std::setw(6)
@@ -436,14 +436,15 @@ void printBaseLine(std::string operand)
         << std::endl;
 }
 
-void printLTORGLine()
+void printLTORGLine(std::ofstream &outfile)
 {
-    std::cout << std::setfill(' ')
-              << std::setw(18)
-              << " "
-              << std::setw(6)
-              << " LTORG"
-              << std::endl;
+    outfile
+        << std::setfill(' ')
+        << std::setw(18)
+        << " "
+        << std::setw(6)
+        << " LTORG"
+        << std::endl;
 }
 
 int main(int argc, char **argv)
@@ -471,10 +472,7 @@ int main(int argc, char **argv)
 
     unsigned int base = 0;
 
-    // redirect cout to a file
-    // not good but it works
-    std::ofstream out("out.lst");
-    std::cout.rdbuf(out.rdbuf());
+    std::ofstream outfile("out.lst");
 
     for (int i = 0; i < objVect.size(); i++)
     {
@@ -494,14 +492,14 @@ int main(int argc, char **argv)
 
                 if (r.needLTORG)
                 {
-                    printLTORGLine();
+                    printLTORGLine(outfile);
                 }
 
-                printListRow(r);
+                printListRow(r, outfile);
 
                 if (base != preBase)
                 {
-                    printBaseLine(r.operand);
+                    printBaseLine(r.operand, outfile);
                 }
             }
 
@@ -552,7 +550,7 @@ int main(int argc, char **argv)
                     std::reverse(newRows.begin(), newRows.end());
                     for (int q = 0; q < newRows.size(); q++)
                     {
-                        printListRow(newRows[q]);
+                        printListRow(newRows[q], outfile);
                     }
                 }
             }
@@ -571,13 +569,14 @@ int main(int argc, char **argv)
                     "0",
                     false};
             r.addr = std::stoi(objVect[i].substr(7, 6), NULL, 16);
-            printListRow(r);
+            printListRow(r, outfile);
         }
         else if (objVect[i][0] == 'E')
         {
-            std::cout << "                  END       "
-                      << checkSymbolTable(std::stoi(objVect[i].substr(1, 6), NULL, 16), symVect);
+            outfile << "                  END       "
+                    << checkSymbolTable(std::stoi(objVect[i].substr(1, 6), NULL, 16), symVect);
         }
     }
+    outfile.close();
     return 0;
 }
