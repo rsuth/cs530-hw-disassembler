@@ -487,8 +487,13 @@ int main(int argc, char **argv)
     };
 
     unsigned int base = 0;
-
+    
     std::ofstream outfile("out.lst");
+    
+    if (!outfile.is_open()){
+        std::cout << "Error opening output file.";
+        return -1;
+    }
 
     for (int i = 0; i < objVect.size(); i++)
     {
@@ -502,20 +507,25 @@ int main(int argc, char **argv)
 
             while (cursor < recordLength + 9)
             {
-                unsigned int preBase = base;
-                struct ListRow r = readInstruction(locctr, pc, base,
-                                                   cursor, txtRec, symVect, litVect);
+                try {
+                    unsigned int preBase = base;
+                    struct ListRow r = readInstruction(locctr, pc, base,
+                                                    cursor, txtRec, symVect, litVect);
 
-                if (r.needLTORG)
-                {
-                    printLTORGLine(outfile);
-                }
+                    if (r.needLTORG)
+                    {
+                        printLTORGLine(outfile);
+                    }
 
-                printListRow(r, outfile);
+                    printListRow(r, outfile);
 
-                if (base != preBase)
-                {
-                    printBaseLine(r.operand, outfile);
+                    if (base != preBase)
+                    {
+                        printBaseLine(r.operand, outfile);
+                    }
+                } catch(...){
+                    std::cout << "Exception reading instruction";
+                    break;
                 }
             }
 
