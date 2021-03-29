@@ -5,4 +5,4 @@ dissem :
 	$(CXX) $(CXXFLAGS) -o dissem main.cpp
 
 clean :
-	rm *.o
+	rm -rf dissem dissem.dSYM || true

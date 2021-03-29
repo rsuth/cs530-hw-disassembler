@@ -8,6 +8,7 @@
 #include <fstream>
 #include <sstream>
 #include <algorithm>
+#include <regex>
 
 const int OPTABLE_LEN = 43;
 
@@ -390,6 +391,7 @@ bool readSymFile(const char *path, std::vector<SymbolEntry> &symVec, std::vector
     {
         if (fileLines[i].empty())
         // we've reached the end of the symbol table
+        // and the start of the literals table
         {
             i += 3;
             break;
@@ -405,12 +407,19 @@ bool readSymFile(const char *path, std::vector<SymbolEntry> &symVec, std::vector
     }
     for (int j = i; j < fileLines.size(); j++)
     {
+        std::regex pattern(" +([A-Z]+)? +=[XC]'([0-9A-Fa-f]+)' +([0-9A-Fa-f]+) +([0-9A-Fa-f]+)");
+        std::smatch matches;
+
         struct LitEntry l;
-        l.name = fileLines[j].substr(0, 6);
-        l.lit = fileLines[j].substr(11, 6);
-        l.length = std::stoi(fileLines[j].substr(20, 1), NULL, 16);
-        l.address = std::stoi(fileLines[j].substr(29, 6), NULL, 16);
-        litVec.push_back(l);
+
+        if(std::regex_search(fileLines[j], matches, pattern)){
+            // match found on this line
+            l.name = matches[1];
+            l.lit = matches[2];
+            l.length = std::stoi(matches[3], NULL, 16);
+            l.address = std::stoi(matches[4], NULL, 16);
+            litVec.push_back(l);
+        }
     }
     return 1;
 }
@@ -427,7 +436,7 @@ void printListRow(ListRow r, std::ofstream &outfile)
         << " "
         << std::setw(6)
         << r.opPrefix + r.op
-        << std::setw(4)
+        << std::setw(3)
         << " "
         << std::left
         << std::setw(10)
