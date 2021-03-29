@@ -407,8 +407,11 @@ bool readSymFile(const char *path, std::vector<SymbolEntry> &symVec, std::vector
     }
     for (int j = i; j < fileLines.size(); j++)
     {
-        std::regex pattern(" +([A-Z]+)? +=[XC]'([0-9A-Fa-f]+)' +([0-9A-Fa-f]+) +([0-9A-Fa-f]+)");
-        std::smatch matches;
+	try {
+        	std::regex pattern(" +([A-Z]+)? +=[XC]'([0-9A-Fa-f]+)' +([0-9A-Fa-f]+) +([0-9A-Fa-f]+)");
+         
+		
+	std::smatch matches;
 
         struct LitEntry l;
 
@@ -420,6 +423,12 @@ bool readSymFile(const char *path, std::vector<SymbolEntry> &symVec, std::vector
             l.address = std::stoi(matches[4], NULL, 16);
             litVec.push_back(l);
         }
+	}
+	catch (const std::regex_error& e)
+	{
+		std::cout << "Regex Error caught: " << e.what() << std::endl;
+	}
+
     }
     return 1;
 }
