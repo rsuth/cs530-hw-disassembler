@@ -225,7 +225,23 @@ struct ListRow readInstruction(unsigned int &locctr, unsigned int &pc, unsigned 
     ret.label = checkSymbolTable(ret.addr, symVec);
 
     OpCode op = getOpCode(std::stoi(txtRecord.substr(cursor, 2), NULL, 16));
+    
+    // special case of RSUB
+    if(op.mnemonic == "RSUB"){
+        ret.opPrefix = " ";
+        ret.op = "RSUB";
+        ret.operandPrefix = " ";
+        ret.operand = " ";
+        ret.operandSuffix = " ";
+        ret.objCode = "4C0000";
+        ret.needLTORG = false;
+        cursor += 6;
+        locctr += 3;
+        return ret;
+    }
+
     int instructionBytes = 0;
+    
     if (!op.format2)
     {
         // set flag bits
@@ -503,7 +519,7 @@ int main(int argc, char **argv)
                 }
             }
 
-            if ((objVect[i + 1][0] == 'T'))
+            if (objVect[i + 1][0] == 'T')
             {
                 // check for gap in addresses
                 int nextRecordAddr = std::stoi(objVect[i + 1].substr(1, 6), NULL, 16);
