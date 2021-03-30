@@ -37,6 +37,7 @@ struct ListRow
     bool needLTORG;
 };
 
+// SYMTAB entry datatype
 struct SymbolEntry
 {
     std::string name;
@@ -49,6 +50,7 @@ struct SymbolEntry
     }
 };
 
+// LITTAB entry datatype
 struct LitEntry
 {
     std::string name;
@@ -57,6 +59,13 @@ struct LitEntry
     unsigned int address;
 };
 
+/**
+ * Search symbol table for address
+ * 
+ * @param addr the address to look for
+ * @param litVec vector containing the symbol entries in the SYMTAB.
+ * @return string of the symbol name matching the given address.
+ */
 std::string checkSymbolTable(unsigned int value, std::vector<SymbolEntry> symVec)
 {
     std::string ret = "";
@@ -70,6 +79,13 @@ std::string checkSymbolTable(unsigned int value, std::vector<SymbolEntry> symVec
     return ret;
 }
 
+/**
+ * Search literals table for address
+ * 
+ * @param addr the address to look for
+ * @param litVec vector containing the literal entries in the LITTAB.
+ * @return LitEntry matching the given address.
+ */
 struct LitEntry checkLitTable(unsigned int addr, std::vector<LitEntry> litVec)
 {
     LitEntry ret = {"", "", -1, 0};
@@ -83,6 +99,12 @@ struct LitEntry checkLitTable(unsigned int addr, std::vector<LitEntry> litVec)
     return ret;
 }
 
+/**
+ * Opcode lookup function
+ *  
+ * @param code the integer representation of the first 2 hex digits (first 8 bits) of the instruction
+ * @return OpCode object containing { code, mnemonic, LTORG flag } from table.
+ */
 OpCode getOpCode(unsigned int code)
 {
     // use bitmask to get the first 6 bits
@@ -99,8 +121,13 @@ OpCode getOpCode(unsigned int code)
     return {-1, "ERROR", false};
 }
 
-// reads number and fills the nixbpe array
-void getFlagBits(int code, bool (&nixbpe)[6])
+/**
+ * read flag bits into nixbpe flag array
+ *  
+ * @param code the integer representation of the 2nd and 3rd hex digits (bits 4-12) of the instruction
+ * @param nixbpe the flag bits boolean array to be filled by this function.
+ */
+void getFlagBits(unsigned int code, bool (&nixbpe)[6])
 {
     for (int i = 0; i < 6; i++)
     {
@@ -108,7 +135,15 @@ void getFlagBits(int code, bool (&nixbpe)[6])
     }
 }
 
-// calculates the operand from the disp/address
+/**
+ * calculate the target address
+ *  
+ * @param disp string representing the hex digits that make up the disp field of the instruction.
+ * @param nixbpe the flag bits as a boolean array.
+ * @param pc the current value in the program counter
+ * @param base the current value in the base register
+ * @return string that should be prepended to the operand field in the lst file.  
+ */
 unsigned int getOperandAddress(std::string disp, const bool nixbpe[6], const int pc, const int base)
 {
     unsigned int ta = std::stoi(disp, NULL, 16);
@@ -129,6 +164,12 @@ unsigned int getOperandAddress(std::string disp, const bool nixbpe[6], const int
     return ta;
 }
 
+/**
+ * get the correct prefix for a given operand
+ * 
+ * @param nixbpe the flag bits as a boolean array.
+ * @return string that should be prepended to the operand field in the lst file.  
+ */
 std::string getOperandPrefix(const bool nixbpe[6])
 {
     if (nixbpe[0] == nixbpe[1])
@@ -152,6 +193,12 @@ std::string getOperandPrefix(const bool nixbpe[6])
     }
 }
 
+/**
+ * get the correct suffix for a given operand
+ * 
+ * @param nixbpe the flag bits as a boolean array.
+ * @return string that should be appended to the operand field in the lst file.  
+ */
 std::string getOperandSuffix(const bool nixbpe[6])
 {
     if (nixbpe[2])
@@ -164,6 +211,13 @@ std::string getOperandSuffix(const bool nixbpe[6])
     }
 }
 
+/**
+ * convert unsigned int to a hexadecimal string representation
+ * 
+ * @param num the int to be converted
+ * @param digits the number of digits to use, with 0-padding. pasing a value of -1 does not pad at all.
+ * @return hexadecimal string representation of the number.  
+ */
 std::string intToHexString(unsigned int num, int digits)
 {
     // https://stackoverflow.com/questions/5100718/integer-to-hex-string-in-c
@@ -183,6 +237,19 @@ std::string intToHexString(unsigned int num, int digits)
     return sstream.str();
 }
 
+
+/**
+ * read an instruction from the object code file and get the corresponding list file row
+ * 
+ * @param locctr the current instruction's address, incremented by this function
+ * @param pc  program counter variable, incremented by this function
+ * @param base base register variable, possibly changed by this function
+ * @param cursor the beginning half-byte position of the current instruction within the text record
+ * @param txtRecord the current text record being read
+ * @param symVec the symbol table vector
+ * @param litvec the literals table vector
+ * @return A ListRow struct containing all needed data for creating a row of the list file.
+ */
 struct ListRow readInstruction(unsigned int &locctr, unsigned int &pc, unsigned int &base,
                                int &cursor, const std::string txtRecord,
                                const std::vector<SymbolEntry> symVec,
@@ -226,9 +293,10 @@ struct ListRow readInstruction(unsigned int &locctr, unsigned int &pc, unsigned 
     ret.label = checkSymbolTable(ret.addr, symVec);
 
     OpCode op = getOpCode(std::stoi(txtRecord.substr(cursor, 2), NULL, 16));
-    
+
     // special case of RSUB
-    if(op.mnemonic == "RSUB"){
+    if (op.mnemonic == "RSUB")
+    {
         ret.opPrefix = " ";
         ret.op = "RSUB";
         ret.operandPrefix = " ";
@@ -242,7 +310,7 @@ struct ListRow readInstruction(unsigned int &locctr, unsigned int &pc, unsigned 
     }
 
     int instructionBytes = 0;
-    
+
     if (!op.format2)
     {
         // set flag bits
@@ -351,8 +419,13 @@ struct ListRow readInstruction(unsigned int &locctr, unsigned int &pc, unsigned 
     return ret;
 }
 
-// reads the object file into objVec
-// return 1 for success, 0 for failure
+/**
+ * Read an .obj file
+ * 
+ * @param path path to the .obj file.
+ * @param objVec Vector of strings representing each line of the object file.
+ * @return 0 on failure, 1 on success.
+ */
 bool readObjFile(const char *path, std::vector<std::string> &objVec)
 {
     std::ifstream objFile(path);
@@ -369,6 +442,14 @@ bool readObjFile(const char *path, std::vector<std::string> &objVec)
     return 1;
 }
 
+/**
+ * Read a .sym Symbol/Literals table file.
+ * 
+ * @param path path to .sym file.
+ * @param symVec a Vector of SymbolEnrys to be filled.
+ * @param litVec a Vector of LitEntrys to be filled.
+ * @return 0 on failure, 1 on success
+ */
 bool readSymFile(const char *path, std::vector<SymbolEntry> &symVec, std::vector<LitEntry> &litVec)
 {
     std::ifstream symFile(path);
@@ -407,32 +488,42 @@ bool readSymFile(const char *path, std::vector<SymbolEntry> &symVec, std::vector
     }
     for (int j = i; j < fileLines.size(); j++)
     {
-	try {
-        	std::regex pattern(" +([A-Z]+)? +=[XC]'([0-9A-Fa-f]+)' +([0-9A-Fa-f]+) +([0-9A-Fa-f]+)");
-         
-		
-	std::smatch matches;
+        try
+        {
+            // TODO:
+            // figure out how to read the literal table without regex because 
+            // <regex> does not work with the old g++ version on edoras.
+            std::regex pattern(" +([A-Z]+)? +=[XC]'([0-9A-Fa-f]+)' +([0-9A-Fa-f]+) +([0-9A-Fa-f]+)");
 
-        struct LitEntry l;
+            std::smatch matches;
 
-        if(std::regex_search(fileLines[j], matches, pattern)){
-            // match found on this line
-            l.name = matches[1];
-            l.lit = matches[2];
-            l.length = std::stoi(matches[3], NULL, 16);
-            l.address = std::stoi(matches[4], NULL, 16);
-            litVec.push_back(l);
+            struct LitEntry l;
+
+            if (std::regex_search(fileLines[j], matches, pattern))
+            {
+                // match found on this line
+                l.name = matches[1];
+                l.lit = matches[2];
+                l.length = std::stoi(matches[3], NULL, 16);
+                l.address = std::stoi(matches[4], NULL, 16);
+                litVec.push_back(l);
+            }
         }
-	}
-	catch (const std::regex_error& e)
-	{
-		std::cout << "Regex Error caught: " << e.what() << std::endl;
-	}
-
+        catch (const std::regex_error &e)
+        {
+            std::cout << "Regex Error caught: " << e.what() << std::endl;
+            return 0;
+        }
     }
     return 1;
 }
 
+/**
+ * Prints a row of the list file.
+ * 
+ * @param r a ListRow object
+ * @param outfile the lst file output stream
+ */
 void printListRow(ListRow r, std::ofstream &outfile)
 {
     outfile
@@ -456,6 +547,12 @@ void printListRow(ListRow r, std::ofstream &outfile)
         << std::endl;
 }
 
+/**
+ * Print BASE line to lst file.
+ * 
+ * @param operand the address or symbol that LDB used.
+ * @param outfile .lst file output stream.
+ */
 void printBaseLine(std::string operand, std::ofstream &outfile)
 {
     outfile
@@ -470,6 +567,11 @@ void printBaseLine(std::string operand, std::ofstream &outfile)
         << std::endl;
 }
 
+/**
+ * Print LTORG line to lst file.
+ * 
+ * @param outfile .lst file output stream.
+ */
 void printLTORGLine(std::ofstream &outfile)
 {
     outfile
@@ -505,10 +607,11 @@ int main(int argc, char **argv)
     };
 
     unsigned int base = 0;
-    
+
     std::ofstream outfile("out.lst");
-    
-    if (!outfile.is_open()){
+
+    if (!outfile.is_open())
+    {
         std::cout << "Error opening output file.";
         return -1;
     }
@@ -525,10 +628,11 @@ int main(int argc, char **argv)
 
             while (cursor < recordLength + 9)
             {
-                try {
+                try
+                {
                     unsigned int preBase = base;
                     struct ListRow r = readInstruction(locctr, pc, base,
-                                                    cursor, txtRec, symVect, litVect);
+                                                       cursor, txtRec, symVect, litVect);
 
                     if (r.needLTORG)
                     {
@@ -541,7 +645,9 @@ int main(int argc, char **argv)
                     {
                         printBaseLine(r.operand, outfile);
                     }
-                } catch(...){
+                }
+                catch (...)
+                {
                     std::cout << "Exception reading instruction";
                     break;
                 }
@@ -615,7 +721,7 @@ int main(int argc, char **argv)
             r.addr = std::stoi(objVect[i].substr(7, 6), NULL, 16);
             printListRow(r, outfile);
         }
-        else if (objVect[i][0] == 'E')
+        else if (objVect[i][0] == 'E') // end record
         {
             outfile << "                  END       "
                     << checkSymbolTable(std::stoi(objVect[i].substr(1, 6), NULL, 16), symVect);
