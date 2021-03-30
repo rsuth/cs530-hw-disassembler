@@ -18,3 +18,9 @@ To handle RESW directives, the program detects gaps between the starting address
 
 The Header and End records are simple and just involve simple extraction and print formatting.
 
+## TODO:
+[] refactor into seperate files
+[] update literals table read to not use regex
+[] turn some stuff into classes?
+[] #FIRST should be #0 in one case, check that out
+[] write some automated tests
