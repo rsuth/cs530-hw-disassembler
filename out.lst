@@ -8,12 +8,14 @@
 0841              CLEAR    A            B400
 0843              LDX     #FIRST        050000
 0846              LDA     #5            010005
-0849    WLOOP     TD       855          E32009
+0849    WLOOP     TD      =X'000001'    E32009
 084C              JEQ      WLOOP        332FFA
 084F              LDCH     RETADR,X     53AFEC
-0852              WD       855          DF2000
-0855              LDA      1            000001
-0858             +LDA      1090         03101090
+0852              WD      =X'000001'    DF2000
+                   LTORG
+0855              *       =X'000001'    000001
+0858             +LDA     =X'000007'    03101090
 085C    EADR      RESW     700           
-1090              LDA      7            000007
+                   LTORG
+1090              *       =X'000007'    000007
                   END       FIRST 

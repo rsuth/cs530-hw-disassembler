@@ -718,6 +718,7 @@ int main(int argc, char **argv)
                     " ",
                     "0",
                     false};
+                    
             r.addr = std::stoi(objVect[i].substr(7, 6), NULL, 16);
             printListRow(r, outfile);
         }
