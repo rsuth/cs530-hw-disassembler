@@ -9,6 +9,7 @@
 #include <sstream>
 #include <algorithm>
 #include <regex>
+#include "ListRow.h"
 
 const int OPTABLE_LEN = 43;
 
@@ -22,20 +23,6 @@ struct OpCode
 
 const struct OpCode OP_TABLE[] = {{0x18, "ADD", false}, {0x58, "ADDF", false}, {0x40, "AND", false}, {0xB4, "CLEAR", true}, {0x28, "COMP", false}, {0x88, "COMPF", false}, {0x24, "DIV", false}, {0x64, "DIVF", false}, {0x3C, "J", false}, {0x30, "JEQ", false}, {0x34, "JGT", false}, {0x38, "JLT", false}, {0x48, "JSUB", false}, {0x00, "LDA", false}, {0x68, "LDB", false}, {0x50, "LDCH", false}, {0x70, "LDF", false}, {0x08, "LDL", false}, {0x6C, "LDS", false}, {0x74, "LDT", false}, {0x04, "LDX", false}, {0xD0, "LPS", false}, {0x20, "MUL", false}, {0x60, "MULF", false}, {0x44, "OR", false}, {0xD8, "RD", false}, {0x4C, "RSUB", false}, {0xEC, "SSK", false}, {0x0C, "STA", false}, {0x78, "STB", false}, {0x54, "STCH", false}, {0x80, "STF", false}, {0xD4, "STI", false}, {0x14, "STL", false}, {0x7C, "STS", false}, {0xE8, "STSW", false}, {0x84, "STT", false}, {0x10, "STX", false}, {0x1C, "SUB", false}, {0x5C, "SUBF", false}, {0xE0, "TD", false}, {0x2C, "TIX", false}, {0xDC, "WD", false}};
 const std::string REGISTER_TABLE[] = {"A", "X", "L", "B", "S", "T", "F"};
-
-// List file row datatype
-struct ListRow
-{
-    unsigned int addr;
-    std::string label;
-    std::string op;
-    std::string opPrefix;
-    std::string operand;
-    std::string operandPrefix;
-    std::string operandSuffix;
-    std::string objCode;
-    bool needLTORG;
-};
 
 // SYMTAB entry datatype
 struct SymbolEntry
@@ -212,33 +199,6 @@ std::string getOperandSuffix(const bool nixbpe[6])
 }
 
 /**
- * convert unsigned int to a hexadecimal string representation
- * 
- * @param num the int to be converted
- * @param digits the number of digits to use, with 0-padding. pasing a value of -1 does not pad at all.
- * @return hexadecimal string representation of the number.  
- */
-std::string intToHexString(unsigned int num, int digits)
-{
-    // https://stackoverflow.com/questions/5100718/integer-to-hex-string-in-c
-    std::stringstream sstream;
-    if (digits > 0)
-    {
-        sstream << std::setfill('0')
-                << std::setw(digits)
-                << std::hex
-                << std::uppercase
-                << num;
-    }
-    else
-    {
-        sstream << std::hex << num;
-    }
-    return sstream.str();
-}
-
-
-/**
  * read an instruction from the object code file and get the corresponding list file row
  * 
  * @param locctr the current instruction's address, incremented by this function
@@ -250,24 +210,15 @@ std::string intToHexString(unsigned int num, int digits)
  * @param litvec the literals table vector
  * @return A ListRow struct containing all needed data for creating a row of the list file.
  */
-struct ListRow readInstruction(unsigned int &locctr, unsigned int &pc, unsigned int &base,
-                               int &cursor, const std::string txtRecord,
-                               const std::vector<SymbolEntry> symVec,
-                               const std::vector<LitEntry> litvec)
+ListRow readInstruction(unsigned int &locctr, unsigned int &pc, unsigned int &base,
+                        int &cursor, const std::string txtRecord,
+                        const std::vector<SymbolEntry> symVec,
+                        const std::vector<LitEntry> litvec)
 {
-    struct ListRow ret =
-        {
-            0,
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            false};
-
+    ListRow ret = ListRow();
     ret.addr = locctr;
+
+    int instructionBytes = 0;
 
     struct LitEntry lit = checkLitTable(locctr, litvec);
     if (lit.length > 0)
@@ -279,7 +230,6 @@ struct ListRow readInstruction(unsigned int &locctr, unsigned int &pc, unsigned 
         ret.operand = lit.lit;
         ret.operandSuffix = "'";
         ret.objCode = txtRecord.substr(cursor, (lit.length));
-        ret.needLTORG = true;
 
         // move cursor to start of next instruction
         cursor += lit.length;
@@ -303,13 +253,10 @@ struct ListRow readInstruction(unsigned int &locctr, unsigned int &pc, unsigned 
         ret.operand = " ";
         ret.operandSuffix = " ";
         ret.objCode = "4C0000";
-        ret.needLTORG = false;
         cursor += 6;
         locctr += 3;
         return ret;
     }
-
-    int instructionBytes = 0;
 
     if (!op.format2)
     {
@@ -344,7 +291,7 @@ struct ListRow readInstruction(unsigned int &locctr, unsigned int &pc, unsigned 
                 else
                 {
                     // its a constant or immediate.
-                    ret.operand = intToHexString(std::stoi(txtRecord.substr(cursor + 3, 5), NULL, 16), -1);
+                    ret.operand = ListRow::intToHexString(std::stoi(txtRecord.substr(cursor + 3, 5), NULL, 16), -1);
                 }
             }
 
@@ -384,7 +331,7 @@ struct ListRow readInstruction(unsigned int &locctr, unsigned int &pc, unsigned 
                 else
                 {
                     // its a constant or immediate.
-                    ret.operand = intToHexString(addr, -1);
+                    ret.operand = ListRow::intToHexString(addr, -1);
                 }
             }
             // if LDB we need to update base:
@@ -491,7 +438,7 @@ bool readSymFile(const char *path, std::vector<SymbolEntry> &symVec, std::vector
         try
         {
             // TODO:
-            // figure out how to read the literal table without regex because 
+            // figure out how to read the literal table without regex because
             // <regex> does not work with the old g++ version on edoras.
             std::regex pattern(" +([A-Z]+)? +=[XC]'([0-9A-Fa-f]+)' +([0-9A-Fa-f]+) +([0-9A-Fa-f]+)");
 
@@ -518,71 +465,6 @@ bool readSymFile(const char *path, std::vector<SymbolEntry> &symVec, std::vector
     return 1;
 }
 
-/**
- * Prints a row of the list file.
- * 
- * @param r a ListRow object
- * @param outfile the lst file output stream
- */
-void printListRow(ListRow r, std::ofstream &outfile)
-{
-    outfile
-        << intToHexString(r.addr, 4)
-        << std::setw(4)
-        << " "
-        << std::setw(6)
-        << r.label
-        << std::setw(3)
-        << " "
-        << std::setw(6)
-        << r.opPrefix + r.op
-        << std::setw(3)
-        << " "
-        << std::left
-        << std::setw(10)
-        << r.operandPrefix + r.operand + r.operandSuffix
-        << std::setw(4)
-        << " "
-        << r.objCode
-        << std::endl;
-}
-
-/**
- * Print BASE line to lst file.
- * 
- * @param operand the address or symbol that LDB used.
- * @param outfile .lst file output stream.
- */
-void printBaseLine(std::string operand, std::ofstream &outfile)
-{
-    outfile
-        << std::setw(17)
-        << " "
-        << std::setw(6)
-        << " BASE"
-        << std::setw(4)
-        << " "
-        << std::setw(6)
-        << " " + operand
-        << std::endl;
-}
-
-/**
- * Print LTORG line to lst file.
- * 
- * @param outfile .lst file output stream.
- */
-void printLTORGLine(std::ofstream &outfile)
-{
-    outfile
-        << std::setfill(' ')
-        << std::setw(18)
-        << " "
-        << std::setw(6)
-        << " LTORG"
-        << std::endl;
-}
-
 int main(int argc, char **argv)
 {
     std::vector<std::string> objVect;
@@ -606,15 +488,14 @@ int main(int argc, char **argv)
         return -1;
     };
 
-    unsigned int base = 0;
-
     std::ofstream outfile("out.lst");
-
     if (!outfile.is_open())
     {
         std::cout << "Error opening output file.";
         return -1;
     }
+
+    unsigned int base = 0;
 
     for (int i = 0; i < objVect.size(); i++)
     {
@@ -630,21 +511,9 @@ int main(int argc, char **argv)
             {
                 try
                 {
-                    unsigned int preBase = base;
-                    struct ListRow r = readInstruction(locctr, pc, base,
-                                                       cursor, txtRec, symVect, litVect);
-
-                    if (r.needLTORG)
-                    {
-                        printLTORGLine(outfile);
-                    }
-
-                    printListRow(r, outfile);
-
-                    if (base != preBase)
-                    {
-                        printBaseLine(r.operand, outfile);
-                    }
+                    ListRow row = readInstruction(locctr, pc, base,
+                                                  cursor, txtRec, symVect, litVect);
+                    row.print(outfile);
                 }
                 catch (...)
                 {
@@ -680,17 +549,9 @@ int main(int argc, char **argv)
                     unsigned int last = nextRecordAddr;
                     for (int k = resWs.size() - 1; k >= 0; k--)
                     {
-                        struct ListRow r =
-                            {
-                                resWs[k].value,
-                                resWs[k].name,
-                                "RESW",
-                                " ",
-                                " ",
-                                " ",
-                                " ",
-                                " ",
-                                false};
+                        ListRow r = ListRow(resWs[k].value, resWs[k].name,
+                                            "RESW", " ", " ", " ", " ", " ");
+
                         // get the gap between the last RESW and this one.
                         int gap = last - resWs[k].value;
                         r.operand = std::to_string(gap / 3);
@@ -700,27 +561,17 @@ int main(int argc, char **argv)
                     std::reverse(newRows.begin(), newRows.end());
                     for (int q = 0; q < newRows.size(); q++)
                     {
-                        printListRow(newRows[q], outfile);
+                        newRows[q].print(outfile);
                     }
                 }
             }
         }
         else if (objVect[i][0] == 'H') // header record
         {
-            struct ListRow r =
-                {
-                    0,
-                    objVect[i].substr(1, 6),
-                    " ",
-                    " ",
-                    "START",
-                    " ",
-                    " ",
-                    "0",
-                    false};
-                    
+            ListRow r = ListRow(0, objVect[i].substr(1, 6), " ", " ", "START",
+                                " ", " ", "0");
             r.addr = std::stoi(objVect[i].substr(7, 6), NULL, 16);
-            printListRow(r, outfile);
+            r.print(outfile);
         }
         else if (objVect[i][0] == 'E') // end record
         {

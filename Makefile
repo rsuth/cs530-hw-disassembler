@@ -1,8 +1,14 @@
 CXX=g++
 CXXFLAGS=-std=c++11 -g
 
-dissem :
-	$(CXX) $(CXXFLAGS) -o dissem main.cpp
+dissem : main.o ListRow.o
+	$(CXX) $(CXXFLAGS) -o dissem main.o ListRow.o
+
+main.o: main.cpp
+	$(CXX) $(CXXFLAGS) -c main.cpp
+
+ListRow.o: ListRow.cpp
+	$(CXX) $(CXXFLAGS) -c ListRow.cpp
 
 clean :
-	rm -rf dissem dissem.dSYM || true
+	rm -rf dissem dissem.dSYM *.o || true

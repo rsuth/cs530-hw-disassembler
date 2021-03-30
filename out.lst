@@ -12,10 +12,10 @@
 084C              JEQ      WLOOP        332FFA
 084F              LDCH     RETADR,X     53AFEC
 0852              WD      =X'000001'    DF2000
-                   LTORG
+                  LTORG
 0855              *       =X'000001'    000001
 0858             +LDA     =X'000007'    03101090
 085C    EADR      RESW     700           
-                   LTORG
+                  LTORG
 1090              *       =X'000007'    000007
                   END       FIRST 
