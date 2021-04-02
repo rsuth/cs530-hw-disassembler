@@ -6,7 +6,6 @@
 #include <vector>
 #include <string>
 #include <fstream>
-#include <sstream>
 #include <algorithm>
 #include <regex>
 #include "ListRow.h"
@@ -40,7 +39,6 @@ struct SymbolEntry
 // LITTAB entry datatype
 struct LitEntry
 {
-    std::string name;
     std::string lit;
     int length;
     unsigned int address;
@@ -75,7 +73,7 @@ std::string checkSymbolTable(unsigned int value, std::vector<SymbolEntry> symVec
  */
 struct LitEntry checkLitTable(unsigned int addr, std::vector<LitEntry> litVec)
 {
-    LitEntry ret = {"", "", -1, 0};
+    LitEntry ret = {"", -1, 0};
     for (int i = 0; i < litVec.size(); i++)
     {
         if (litVec[i].address == addr)
@@ -208,7 +206,7 @@ std::string getOperandSuffix(const bool nixbpe[6])
  * @param txtRecord the current text record being read
  * @param symVec the symbol table vector
  * @param litvec the literals table vector
- * @return A ListRow struct containing all needed data for creating a row of the list file.
+ * @return A ListRow Onject containing all needed data for creating a row of the list file.
  */
 ListRow readInstruction(unsigned int &locctr, unsigned int &pc, unsigned int &base,
                         int &cursor, const std::string txtRecord,
@@ -233,7 +231,7 @@ ListRow readInstruction(unsigned int &locctr, unsigned int &pc, unsigned int &ba
 
         // move cursor to start of next instruction
         cursor += lit.length;
-
+        pc += lit.length/2;
         // update address counter
         locctr += lit.length / 2;
 
@@ -252,9 +250,10 @@ ListRow readInstruction(unsigned int &locctr, unsigned int &pc, unsigned int &ba
         ret.operandPrefix = " ";
         ret.operand = " ";
         ret.operandSuffix = " ";
-        ret.objCode = "4C0000";
+        ret.objCode = "4F0000";
         cursor += 6;
         locctr += 3;
+        pc += 3;
         return ret;
     }
 
@@ -314,8 +313,13 @@ ListRow readInstruction(unsigned int &locctr, unsigned int &pc, unsigned int &ba
             std::string s = checkSymbolTable(addr, symVec);
             if (!s.empty())
             {
-                // found a match in the symbol table.
-                ret.operand = s;
+                if(ret.op != "LDX"){
+                    // found a match in the symbol table.
+                    ret.operand = s;
+                } else {
+                    // its a constant or immediate.
+                    ret.operand = ListRow::intToHexString(addr, -1);
+                }
             }
             else
             {
@@ -427,7 +431,8 @@ bool readSymFile(const char *path, std::vector<SymbolEntry> &symVec, std::vector
         else
         {
             struct SymbolEntry s;
-            s.name = fileLines[i].substr(0, 6);
+            std::string tmp = fileLines[i].substr(0, 6);
+            s.name = tmp.erase(tmp.find_last_not_of(" \n\r\t")+1);
             s.value = std::stoi(fileLines[i].substr(8, 6), NULL, 16);
             s.flag = fileLines[i].substr(16, 1);
             symVec.push_back(s);
@@ -435,33 +440,35 @@ bool readSymFile(const char *path, std::vector<SymbolEntry> &symVec, std::vector
     }
     for (int j = i; j < fileLines.size(); j++)
     {
-        try
+        struct LitEntry l = {"", -1, 0};
+        int k = fileLines[j].length();
+        // std::cout << "Lit Line " << j << " Length" << k << std::endl;
+        while (k > 0)
+        // TODO:
+        // there has to be a better way (no regex allowed on edoras))
         {
-            // TODO:
-            // figure out how to read the literal table without regex because
-            // <regex> does not work with the old g++ version on edoras.
-            std::regex pattern(" +([A-Z]+)? +=[XC]'([0-9A-Fa-f]+)' +([0-9A-Fa-f]+) +([0-9A-Fa-f]+)");
-
-            std::smatch matches;
-
-            struct LitEntry l;
-
-            if (std::regex_search(fileLines[j], matches, pattern))
+            if (fileLines[j][k] >= 48 && l.address == 0)
             {
-                // match found on this line
-                l.name = matches[1];
-                l.lit = matches[2];
-                l.length = std::stoi(matches[3], NULL, 16);
-                l.address = std::stoi(matches[4], NULL, 16);
-                litVec.push_back(l);
+                l.address = std::stoi(fileLines[j].substr(k - 5, 6), NULL, 16);
+                k = k-6;
             }
+            else if (fileLines[j][k] > 48 && l.length < 0)
+            {
+                l.length = std::stoi(fileLines[j].substr(k, 1));
+            }
+            else if ((fileLines[j][k] == '\'') && (l.lit.length() == 0))
+            {
+                l.lit = fileLines[j].substr(k - l.length, l.length);
+            }
+            k--;
         }
-        catch (const std::regex_error &e)
+        if (l.address > 0)
         {
-            std::cout << "Regex Error caught: " << e.what() << std::endl;
-            return 0;
+            litVec.push_back(l);
+            std::cout << l.lit << " " << l.length << " " << l.address << std::endl;
         }
     }
+
     return 1;
 }
 
@@ -521,48 +528,52 @@ int main(int argc, char **argv)
                     break;
                 }
             }
-
+            int nextRecordAddr;
+            // check for gap in addresses
             if (objVect[i + 1][0] == 'T')
             {
-                // check for gap in addresses
-                int nextRecordAddr = std::stoi(objVect[i + 1].substr(1, 6), NULL, 16);
-                if (nextRecordAddr != pc)
+                nextRecordAddr = std::stoi(objVect[i + 1].substr(1, 6), NULL, 16);
+            }
+            else
+            {
+                nextRecordAddr = std::stoi(objVect[0].substr(13, 6), NULL, 16);
+            }
+            if (nextRecordAddr != pc)
+            {
+                // there is a gap
+                // create a vector of listRows to add
+                std::vector<ListRow> newRows;
+
+                // create a vector of Symbols that fall in this gap
+                std::vector<SymbolEntry> resWs;
+
+                for (int j = 0; j < symVect.size(); j++)
                 {
-                    // there is a gap
-                    // create a vector of listRows to add
-                    std::vector<ListRow> newRows;
-
-                    // create a vector of Symbols that fall in this gap
-                    std::vector<SymbolEntry> resWs;
-
-                    for (int j = 0; j < symVect.size(); j++)
+                    // find all the symbols that fall in this gap.
+                    if (symVect[j].value >= pc && symVect[j].value < nextRecordAddr)
                     {
-                        // find all the symbols that fall in this gap.
-                        if (symVect[j].value >= pc && symVect[j].value < nextRecordAddr)
-                        {
-                            resWs.push_back(symVect[j]);
-                        }
+                        resWs.push_back(symVect[j]);
                     }
+                }
 
-                    std::sort(resWs.begin(), resWs.end());
+                std::sort(resWs.begin(), resWs.end());
 
-                    unsigned int last = nextRecordAddr;
-                    for (int k = resWs.size() - 1; k >= 0; k--)
-                    {
-                        ListRow r = ListRow(resWs[k].value, resWs[k].name,
-                                            "RESW", " ", " ", " ", " ", " ");
+                unsigned int last = nextRecordAddr;
+                for (int k = resWs.size() - 1; k >= 0; k--)
+                {
+                    ListRow r = ListRow(resWs[k].value, resWs[k].name,
+                                        "RESW", " ", " ", " ", " ", " ");
 
-                        // get the gap between the last RESW and this one.
-                        int gap = last - resWs[k].value;
-                        r.operand = std::to_string(gap / 3);
-                        newRows.push_back(r);
-                        last = resWs[k].value;
-                    }
-                    std::reverse(newRows.begin(), newRows.end());
-                    for (int q = 0; q < newRows.size(); q++)
-                    {
-                        newRows[q].print(outfile);
-                    }
+                    // get the gap between the last RESW and this one.
+                    int gap = last - resWs[k].value;
+                    r.operand = std::to_string(gap / 3);
+                    newRows.push_back(r);
+                    last = resWs[k].value;
+                }
+                std::reverse(newRows.begin(), newRows.end());
+                for (int q = 0; q < newRows.size(); q++)
+                {
+                    newRows[q].print(outfile);
                 }
             }
         }
@@ -575,8 +586,9 @@ int main(int argc, char **argv)
         }
         else if (objVect[i][0] == 'E') // end record
         {
-            outfile << "                  END       "
-                    << checkSymbolTable(std::stoi(objVect[i].substr(1, 6), NULL, 16), symVect);
+            outfile << "                  END    "
+                    << checkSymbolTable(std::stoi(objVect[i].substr(1, 6), NULL, 16), symVect) 
+                    << std::endl;
         }
     }
     outfile.close();

@@ -6,7 +6,7 @@
 000A    BADR      RESW     700           
 083E    RETADR    RESW     1             
 0841              CLEAR    A            B400
-0843              LDX     #FIRST        050000
+0843              LDX     #0            050000
 0846              LDA     #5            010005
 0849    WLOOP     TD      =X'000001'    E32009
 084C              JEQ      WLOOP        332FFA
@@ -18,4 +18,4 @@
 085C    EADR      RESW     700           
                   LTORG
 1090              *       =X'000007'    000007
-                  END       FIRST 
+                  END    FIRST
